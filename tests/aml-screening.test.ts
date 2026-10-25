@@ -50,6 +50,11 @@ describe('sanctions screening', () => {
     expect(r.country_blocked).toBe(false);
     expect(r.hit).toBe(false);
   });
+  it('does not flag Syria, whose sanctions program ended in 2025', () => {
+    const r = screenSanctions('Some Neutral Party', { country: 'SY' });
+    expect(r.country_blocked).toBe(false);
+    expect(r.hit).toBe(false);
+  });
 });
 
 describe('structuring detection', () => {
