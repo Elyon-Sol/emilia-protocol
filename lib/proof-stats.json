@@ -21,7 +21,7 @@
     "coveredModelActions": 28,
     "actionCompleteModels": 1,
     "formalMutationOperators": 51,
-    "evidenceSha256": "f5d2a6670c0d84192d134ba56db09ecf67562ac56cbdb9173f4f6fdfc6268362",
+    "evidenceSha256": "df0bb4639f155863417eb83f9640a83be9bfff24b83c52bf75b9563684c5d008",
     "boundary": "selected model/runtime scenarios under explicit projection relations; not a mechanized implementation refinement proof"
   },
   "formalEvidenceCoverage": {
