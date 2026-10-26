@@ -12,12 +12,13 @@
 //    patterns) has no patched release. See the braces section below for the
 //    pinned copy, the reachability review, the probe, and the recheck date.
 //
-// 3. GHSA-68fv-2mgg-jv7q (source-map-js <1.2.2, event-loop denial of service
-//    from hostile indexed source maps) has a patch published on 2026-09-30,
-//    but the repository's seven-day release quarantine holds it until
-//    2026-10-07T14:08:09Z. The exact 1.2.1 copy below is accepted only until
-//    the next UTC day so the lock can move to the quarantined patch without
-//    weakening the supply-chain policy.
+// 3. GHSA-27r3-jxmh-p828 (body-parser >=2.0.0 <2.4.0, denial of service from
+//    trailing bytes after a compressed request body) has a patch published on
+//    2026-10-22T11:39:38Z, but the repository's seven-day release quarantine
+//    holds it until 2026-10-29T11:39:38Z. The exact 2.3.0 copy below, reached
+//    only through @modelcontextprotocol/sdk -> express, is accepted until the
+//    next UTC day so the override can move to 2.4.0 without weakening the
+//    supply-chain policy.
 
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -85,14 +86,14 @@ const REVIEWED_BRACES_AFFECTED = new Map([
   ['@next/eslint-plugin-next', ['node_modules/@next/eslint-plugin-next']],
   ['eslint-config-next', ['node_modules/eslint-config-next']],
 ]);
-const SOURCE_MAP_ADVISORY = 'https://github.com/advisories/GHSA-68fv-2mgg-jv7q';
-const SOURCE_MAP_EXCEPTION_EXPIRES = Date.parse('2026-10-08T00:00:00Z');
-const REVIEWED_SOURCE_MAP = {
-  path: 'node_modules/source-map-js',
-  version: '1.2.1',
-  integrity: 'sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==',
+const BODY_PARSER_ADVISORY = 'https://github.com/advisories/GHSA-27r3-jxmh-p828';
+const BODY_PARSER_EXCEPTION_EXPIRES = Date.parse('2026-10-30T00:00:00Z');
+const REVIEWED_BODY_PARSER = {
+  path: 'node_modules/body-parser',
+  version: '2.3.0',
+  integrity: 'sha512-2cGmJupaNgg+QUwVLAucDuWuoMZ6EX9iHDRswZ5lsNYEmwPaRknMPCLZz07yTzVq/83p4o/wzbDZbBrTvGGTIw==',
 };
-const REVIEWED_ADVISORIES = new Set([REVIEWED_ADVISORY, BRACES_ADVISORY, SOURCE_MAP_ADVISORY]);
+const REVIEWED_ADVISORIES = new Set([REVIEWED_ADVISORY, BRACES_ADVISORY, BODY_PARSER_ADVISORY]);
 
 // npm prints two structurally different JSON payloads on stdout, and its exit
 // status does not tell them apart because it is non-zero for both:
@@ -361,40 +362,40 @@ if (observed.has(BRACES_ADVISORY)) {
   }
 }
 
-if (observed.has(SOURCE_MAP_ADVISORY)) {
-  if (Date.now() >= SOURCE_MAP_EXCEPTION_EXPIRES) {
+if (observed.has(BODY_PARSER_ADVISORY)) {
+  if (Date.now() >= BODY_PARSER_EXCEPTION_EXPIRES) {
     throw new Error(
-      'source-map-js advisory exception expired; install source-map-js 1.2.2 after its seven-day release quarantine',
+      'body-parser advisory exception expired; install body-parser 2.4.0 after its seven-day release quarantine',
     );
   }
-  const vulnerability = report.vulnerabilities['source-map-js'];
+  const vulnerability = report.vulnerabilities['body-parser'];
   if (
     vulnerability?.severity !== 'high'
-    || JSON.stringify(vulnerability.nodes) !== JSON.stringify([REVIEWED_SOURCE_MAP.path])
+    || JSON.stringify(vulnerability.nodes) !== JSON.stringify([REVIEWED_BODY_PARSER.path])
   ) {
-    throw new Error(`source-map-js advisory reaches an unreviewed package set: ${JSON.stringify(vulnerability)}`);
+    throw new Error(`body-parser advisory reaches an unreviewed package set: ${JSON.stringify(vulnerability)}`);
   }
   const lock = JSON.parse(readFileSync(join(process.cwd(), 'package-lock.json'), 'utf8'));
-  const locked = lock.packages?.[REVIEWED_SOURCE_MAP.path];
+  const locked = lock.packages?.[REVIEWED_BODY_PARSER.path];
   if (
-    locked?.version !== REVIEWED_SOURCE_MAP.version
-    || locked?.integrity !== REVIEWED_SOURCE_MAP.integrity
+    locked?.version !== REVIEWED_BODY_PARSER.version
+    || locked?.integrity !== REVIEWED_BODY_PARSER.integrity
   ) {
-    throw new Error('source-map-js advisory copy no longer matches the reviewed version and integrity');
+    throw new Error('body-parser advisory copy no longer matches the reviewed version and integrity');
   }
   const installed = JSON.parse(readFileSync(
-    join(process.cwd(), REVIEWED_SOURCE_MAP.path, 'package.json'),
+    join(process.cwd(), REVIEWED_BODY_PARSER.path, 'package.json'),
     'utf8',
   ));
-  if (installed.version !== REVIEWED_SOURCE_MAP.version) {
-    throw new Error(`unreviewed source-map-js version under advisory: ${installed.version}`);
+  if (installed.version !== REVIEWED_BODY_PARSER.version) {
+    throw new Error(`unreviewed body-parser version under advisory: ${installed.version}`);
   }
 }
 
 const accepted = [];
 if (observed.has(REVIEWED_ADVISORY)) accepted.push('brace-expansion range finding constrained to reviewed, cap-enforced builds');
 if (observed.has(BRACES_ADVISORY)) accepted.push(`braces finding constrained to the pinned dev-only lint copy until ${BRACES_RECHECK_BY}`);
-if (observed.has(SOURCE_MAP_ADVISORY)) accepted.push('source-map-js 1.2.1 held only until the quarantined 1.2.2 patch becomes eligible');
+if (observed.has(BODY_PARSER_ADVISORY)) accepted.push('body-parser 2.3.0 held only until the quarantined 2.4.0 patch becomes eligible');
 console.log(
   `${scope} AUDIT: PASS at ${minimumSeverity}+; `
   + (observed.size === 0 ? 'no advisories observed' : accepted.join('; ')),
