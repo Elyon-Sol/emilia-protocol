@@ -3,12 +3,12 @@
   "evidence_snapshot_at": "2026-10-06T20:59:22.317Z",
   "provenance": {
     "generator": "scripts/generate-llm-context.mts",
-    "input_digest_sha256": "0c3b130fac2e2f7482fd189f7921c001aa7b082e33ac8a909843d02069978722",
+    "input_digest_sha256": "1a29385ade4540beab4500d3d22d61b9f99d1acb17416823f70d6db9953deb1e",
     "generated_from": [
       {
         "path": "docs/ai/context-source.v1.json",
-        "sha256": "e6b51b7e48d7274335eb6f38afac18ffce4530fe44d63e4a46a8bd1243984a80",
-        "bytes": 51922
+        "sha256": "9dd977d280779ca61caaf93a790441d8799ef9406b29bb2952f05f430d8727b7",
+        "bytes": 52407
       },
       {
         "path": "scripts/generate-llm-context.mts",
@@ -47,8 +47,8 @@
       },
       {
         "path": "standards/STATUS.json",
-        "sha256": "4e627cdac7b5eaef0cb1d515d6b11b07def68fb2727114584e3a7befd2957062",
-        "bytes": 82179
+        "sha256": "354de4e91231751e0c10efd12cb2412780029430a826752fc2e64625404270bf",
+        "bytes": 83176
       },
       {
         "path": "caid/conformance/vectors.json",
@@ -4466,7 +4466,8 @@
     "The external Rust result is time-pinned to the vector bundle evaluated at that run. It must not be silently upgraded when the current bundle grows.",
     "Strict clean-room construction acceptance remains false until independent construction attestation is verified under a separately pinned attestor key.",
     "The Internet-Drafts are individual submissions unless the live IETF Datatracker says otherwise. They are not RFCs and do not imply IETF endorsement.",
-    "The canactid URI scheme is provisionally registered in IANA's URI Schemes registry and references CAID-05. Provisional registration is not permanent registration, IETF adoption, IETF endorsement, certification, implementation evidence, deployment evidence, authorization, or proof of execution.",
+    "The canactid URI scheme was provisionally registered in IANA's URI Schemes registry on 2026-10-05 and references CAID-05. Its corrected CRI scheme number is 1033. Provisional registration is not permanent registration, IETF adoption, IETF endorsement, certification, implementation evidence, deployment evidence, authorization, or proof of execution.",
+    "IANA registered application/vnd.emilia.authorization-evidence-challenge+json on 2026-10-06 in the vendor tree, with LIMITED USE and EMILIA Protocol, Inc. as change controller. The type labels the bare AE-CHALLENGE-v1 object; HTTP refusal responses still use application/problem+json. Ticket #1458921 is completed. Registration does not establish IETF adoption, endorsement, certification, implementation, or customer use.",
     "Self-authored compliance mappings are mappings, not certifications or third-party assurance opinions.",
     "EMILIA is not an auditor, an accredited certification body, a regulator, or an insurer. Assurance artifacts support verification and re-performance procedures; authorized independent parties reach audit, certification, regulatory, and underwriting conclusions.",
     "EP-CERT-v1 is a scheme design. No public EMILIA certification program is operating, and CF-1 or EG-1 must not be expanded beyond the exact behavior exercised by its reproducible harness.",
@@ -4756,7 +4757,7 @@
     }
   ],
   "standards_portfolio": {
-    "updated": "2026-10-05",
+    "updated": "2026-10-26",
     "decision_vocabulary": {
       "VERIFIED": "One artifact passed its native verifier under relying-party-selected trust inputs.",
       "MATCH": "Independently verified artifacts denote the same material action directly or under exact pinned mapping profiles.",
