@@ -35,7 +35,7 @@ function sign(context, signingKey = privateKey, clientMutation = x => x){
  return {profile:PROFILE,signoff:{'@type':'ep.signoff',context,webauthn:{authenticator_data:auth.toString('base64url'),client_data_json:client.toString('base64url'),signature}}};
 }
 const vectors=[];
-function add(id, mutate=()=>{}, valid=false, authority=false, outcome){
+function add(id, mutate=(c)=>{}, valid=false, authority=false, outcome){
  const c={context:structuredClone(baseContext),envelope:structuredClone(envelope),options:structuredClone(options)};
  mutate(c); const receipt=sign(c.context, c.signingKey, c.clientMutation); c.after?.(receipt);
  vectors.push({id,receipt_json:c.rawReceipt??c.rawAfter?.(JSON.stringify(receipt))??JSON.stringify(receipt),options:{...c.options,bindingMomentJson:c.rawEnvelope??JSON.stringify(c.envelope)},expected:{valid,authorizes_action:authority,...(outcome?{outcome}:{})}});
