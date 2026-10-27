@@ -12,6 +12,7 @@
 //    patterns) has no patched release. See the braces section below for the
 //    pinned copy, the reachability review, the probe, and the recheck date.
 //
+
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
