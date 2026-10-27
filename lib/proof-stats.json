@@ -21,7 +21,7 @@
     "coveredModelActions": 28,
     "actionCompleteModels": 1,
     "formalMutationOperators": 51,
-    "evidenceSha256": "86a4e182dd332d3627a4e27a6e9d5d43ff0f457c96594040746a3634b515a579",
+    "evidenceSha256": "c5c577e5809156c37f64eea4baffbebe725641fba17de00eec0c3e9d3e6eb37c",
     "boundary": "selected model/runtime scenarios under explicit projection relations; not a mechanized implementation refinement proof"
   },
   "formalEvidenceCoverage": {
@@ -105,7 +105,7 @@
     "status": "passed",
     "claims": 35,
     "evidenceFiles": 264,
-    "evidenceBundleSha256": "4eccd2060be54cf593b302d6bf871ee1325adc9aef540e5df53ad867fcc2b040"
+    "evidenceBundleSha256": "d6322636fee4f218f9e33381fdce88a3a0d20f81f8e80886bce02c97f0bab186"
   },
   "conformance": {
     "suites": 21,
