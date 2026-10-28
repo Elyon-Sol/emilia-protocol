@@ -100,3 +100,53 @@ recovery 9 / 8; uncovered tail 4 / 4. Expected unsafe violations: missing
 1,713 / 804; rollback and common snapshot each 3,653 / 1,526.
 No repository-wide suite or shared evidence generation is needed for this
 standalone model. It is not added to existing formal/runtime claim counts.
+
+## Explicit two-run indistinguishability comparison
+
+`ep_replay_history_twoworld.tla` supplements the destructive replay trace with
+an independent bounded product of two runs. H0 never consumed or entered; H1
+performs a real modeled consume and entry before a crash. Each has separate
+operational and external state and an independently enabled crash transition.
+Both recover with erased local rows and an uncovered genesis anchor/archive.
+`Observe` projects all modeled available recovery inputs (rows, receipt,
+checkpoint/frontier, anchor root/frontier/state, archived payload, high-water
+mark, coverage and continuity). It excludes only scheduler phase and hidden
+observer history, which the recovery decision cannot consult.
+
+`Compare` does **not** require equal observations as a guard. The invariant
+`RecoveredViewsEqual` checks that the two independently reached recovered views
+are equal. `HistoriesActuallyDiffer` simultaneously checks that H0 never
+consumed and H1 did, retaining exactly one extra actual provider entry.
+Thus the comparison is not just a renamed single-run erasure counterexample.
+Weak fairness and `EventuallyComparedAndDecided` require both histories to
+reach comparison and a terminal decision, excluding a vacuous initial-state
+or never-decide result.
+
+At this identical observation, the `all` configuration explores both possible
+observation-based deterministic decisions, ADMIT and REFUSE. The invariant
+`NoDecisionBothSafeAndLive` verifies that neither can give admission to the
+actually unused H0 while retaining at-most-once safety in H1. `safe` chooses
+REFUSE, preserving replay safety at the availability cost of refusing H0.
+`unsafe` chooses ADMIT and produces a concrete H1 replay counterexample with
+two actual entries while H0 receives its first. One common decision models a
+function of identical recovery inputs; it cannot read hidden prior-effect truth.
+This is a bounded impossibility demonstration for the specified observation,
+not an unbounded theorem about randomized, interactive, or richer-observation
+recovery algorithms. Independent additional continuity evidence can distinguish
+the worlds; this experiment explicitly lacks such evidence for the lost suffix.
+
+Run `python3 formal/ep_replay_history_twoworld_check.py [pinned-jar-path]`.
+The runner verifies the same JAR hash and uses one worker, a 512 MiB heap and
+60-second timeout per configuration. Raw logs are in
+`ep_replay_history_results/twoworld-{safe,all,unsafe}.log`. Results: safe 13
+states generated / 10 distinct; all decisions 14 / 11; unsafe expected
+`ReplaySafe` violation 13 / 10. The unsafe trace is checked for both independent
+crashes, consumption, original entry, comparison and the recovery decision.
+
+Remaining acceptance boundaries: integration/review of this supplementary
+model, and any separately required runtime or deployment work. This artifact
+implements no production anchor, archived storage service, loss detector or
+compaction algorithm; it does not establish operator independence or change
+existing public formal/runtime claim counts. The broader safe/recovery model
+continues to assume trusted archived bytes and independently retained anchor
+continuity, and explicitly shows failure when all witnesses roll back together.
