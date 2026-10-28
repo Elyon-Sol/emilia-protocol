@@ -73,11 +73,29 @@ function exactIntegerLiteral(token) {
     const exact = shift < 0 ? digits / divisor : digits * divisor;
     return exact <= 9007199254740991n && Number(exact) === Math.abs(value);
 }
+// Replaces every JSON string literal with "" in one linear pass. Input has
+// already passed strictJsonGate, so escapes are well formed.
+function stripJsonStrings(raw) {
+    let out = '';
+    let i = 0;
+    while (i < raw.length) {
+        if (raw[i] !== '"') {
+            out += raw[i++];
+            continue;
+        }
+        i++;
+        while (i < raw.length && raw[i] !== '"')
+            i += raw[i] === '\\' ? 2 : 1;
+        i++;
+        out += '""';
+    }
+    return out;
+}
 function parseRaw(raw) {
     if (typeof raw !== 'string' || Buffer.byteLength(raw, 'utf8') > 1024 * 1024 || !strictJsonGate(raw).ok) {
         throw new Error('invalid raw JSON');
     }
-    const withoutStrings = raw.replace(/"(?:\\.|[^"\\])*"/gs, '""');
+    const withoutStrings = stripJsonStrings(raw);
     for (const match of withoutStrings.matchAll(/-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g)) {
         if (!exactIntegerLiteral(match[0]))
             throw new Error('outside integer profile');

@@ -98,9 +98,9 @@ for(const field of ['authenticator_data','client_data_json','signature']) {
 }
 add('noncanonical_key_pin',c=>{c.options.principalKeys[keyId].public_key+='=';});
 add('signed_duplicate_client_challenge',c=>{c.clientMutation=raw=>raw.replace('"challenge":','"challenge":"x","challenge":');});
-add('signed_client_surrogate',c=>{c.clientMutation=raw=>raw.replace('{','{"extra":"\\ud800",');});
-add('signed_client_fraction',c=>{c.clientMutation=raw=>raw.replace('{','{"extra":1.00000000000000001,');});
-add('signed_client_cross_origin',c=>{c.clientMutation=raw=>raw.replace('{','{"crossOrigin":true,');});
+add('signed_client_surrogate',c=>{c.clientMutation=raw=>raw.replace(/^\{/,'{"extra":"\\ud800",');});
+add('signed_client_fraction',c=>{c.clientMutation=raw=>raw.replace(/^\{/,'{"extra":1.00000000000000001,');});
+add('signed_client_cross_origin',c=>{c.clientMutation=raw=>raw.replace(/^\{/,'{"crossOrigin":true,');});
 add('signed_client_wrong_origin',c=>{c.clientMutation=raw=>raw.replace(origin,'https://other.example');});
 // Time restrictions avoid language-dependent truncation and ambiguous offsets.
 for (const [id, field, value] of [
