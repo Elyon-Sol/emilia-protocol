@@ -14,7 +14,7 @@ if hashlib.sha256(JAR.read_bytes()).hexdigest() != EXPECTED:
     raise SystemExit('Pinned TLC JAR hash mismatch')
 for mode, mutation in [('safe', None), ('missing', 'UnsafeTreatMissingHistoryAsUnused'),
                        ('rollback', 'UnsafeAllowRolledBackAnchor'),
-                       ('common', 'CommonSnapshotRestore'), ('live', None), ('recovery', None), ('uncovered', None)]:
+                       ('common', 'CommonSnapshotRestore'), ('live', None), ('recovery', None), ('uncovered', None), ('compaction', None)]:
     with tempfile.TemporaryDirectory(prefix=f'ep906-{mode}-') as scratch:
         result = subprocess.run(['java', '-Xmx512m', '-XX:+UseParallelGC', '-cp', str(JAR),
             'tlc2.TLC', '-workers', '1', '-metadir', scratch,
@@ -34,7 +34,7 @@ for mode, mutation in [('safe', None), ('missing', 'UnsafeTreatMissingHistoryAsU
         else:
             assert result.returncode == 0, (mode, result.returncode, output)
             assert 'Model checking completed. No error has been found.' in output
-            if mode in {'live', 'recovery', 'uncovered'}:
+            if mode in {'live', 'recovery', 'uncovered', 'compaction'}:
                 assert 'Finished checking temporal properties' in output
         counts = re.search(r'(\d+ states generated, \d+ distinct states found)', output)
         assert counts, (mode, output)
