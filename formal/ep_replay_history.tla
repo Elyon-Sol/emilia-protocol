@@ -36,6 +36,15 @@ CheckpointAnchored ==
   /\ s' = [s EXCEPT !.anchor = s.log, !.archive = s.log, !.highWater = Len(s.log)]
 Finish == /\ s.dispatch /\ ~s.terminal
           /\ s' = [s EXCEPT !.terminal = TRUE]
+\* Compaction is deliberate deletion, permitted only after sealing the entire
+\* discarded range and retaining the matching archived payload in store two.
+CompactReplayRows ==
+  /\ Complete /\ s.receipt = 0 /\ Len(s.entries) = 1
+  /\ Len(s.log) > 0 /\ s.archive = s.log /\ s.anchor = s.log
+  /\ "Compacted" \notin s.faults
+  /\ s' = [s EXCEPT !.log = Empty, !.checkpoint = Empty,
+      !.coverage = "INCOMPLETE", !.continuity = FALSE,
+      !.faults = @ \cup {"Compacted"}]
 \* Every local destructive event invalidates continuity, including an unanchored tail.
 LocalLoss(kind) ==
   /\ Mode # "live" /\ kind \notin s.faults
@@ -98,6 +107,7 @@ CommonSnapshotRestore ==
       !.anchorState = "CURRENT", !.receipt = 0,
       !.faults = @ \cup {"AllWitnessesRestored"}]
 Next == \/ ConsumeLinearized \/ ProviderEntry \/ CheckpointAnchored \/ Finish
+        \/ (Mode # "live" /\ CompactReplayRows)
         \/ \E k \in {"LoseReplayRows", "LoseDispatchRows", "LoseTerminalEvidence",
                       "LoseCheckpoint", "RollbackPrimaryAndCheckpoint"}: LocalLoss(k)
         \/ \E k \in {"UNAVAILABLE", "ROLLED_BACK", "EQUIVOCATED"}: AnchorFault(k)
@@ -142,5 +152,17 @@ UncoveredTailBlocked == s.faults # {} =>
   /\ ~Complete /\ ~ENABLED RestoreArchivedBytes
   /\ ~ENABLED Recover /\ ~ENABLED ProviderEntry
 EventuallyUncoveredLoss == <> (s.faults = {"LoseReplayRows"})
+CompactionNext ==
+  \/ (s.faults = {} /\ Len(s.entries) = 0 /\ ConsumeLinearized)
+  \/ (s.faults = {} /\ Len(s.entries) = 0 /\ ProviderEntry)
+  \/ (s.faults = {} /\ Len(s.entries) = 1 /\ CheckpointAnchored)
+  \/ CompactReplayRows \/ RestoreArchivedBytes \/ Recover
+CompactionSpec == Init /\ [][CompactionNext]_vars /\ WF_vars(CompactionNext)
+CompactionRecovered == /\ s.faults = {"Compacted"}
+                       /\ s.log = <<"identity">> /\ Complete
+EventuallyCompactionRecovered == <> CompactionRecovered
+CompactedStillConsumed == CompactionRecovered => ~ENABLED ConsumeLinearized
+UncoveredCannotCompact == Len(s.anchor) < Len(s.log) => ~ENABLED CompactReplayRows
+AnchorHighWaterMonotone == [][s'.highWater >= s.highWater]_vars
 NeverUsedEventuallyEnters == <> (Len(s.entries) = 1)
 =============================================================================

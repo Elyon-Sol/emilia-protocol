@@ -32,7 +32,8 @@ in a never-used history: this conservative availability cost prevents treating
 an uncovered lost suffix as unused. `RestoreArchivedBytes` restores missing replay and checkpoint bytes from
 the explicitly retained trusted archive only when its root matches the current
 anchor and its frontier covers the required missing range. `Recover` then
-reestablishes completeness. There is no compaction algorithm or unconditional
+reestablishes completeness. This bounded compaction/restore protocol is not a production compaction implementation.
+There is no unconditional
 recovery liveness claim: unavailable bytes or an uncovered tail remain blocked.
 
 ## Assumptions and their failure
@@ -95,9 +96,10 @@ each unsafe counterexample. It also requires successful temporal checking for
 positive recovery and uncovered-tail reachability/refusal. It does not count a
 parser failure as a counterexample.
 
-Current run: safe 52,681 generated / 14,497 distinct states; live 10 / 9;
-recovery 9 / 8; uncovered tail 4 / 4. Expected unsafe violations: missing
-1,713 / 804; rollback and common snapshot each 3,653 / 1,526.
+Current run: safe 94,873 generated / 25,729 distinct states; live 10 / 9;
+recovery 9 / 8; uncovered tail 4 / 4; compaction recovery 8 / 7. Expected
+unsafe violations: missing 1,728 / 817; rollback and common snapshot each
+3,796 / 1,619.
 No repository-wide suite or shared evidence generation is needed for this
 standalone model. It is not added to existing formal/runtime claim counts.
 
@@ -146,7 +148,39 @@ crashes, consumption, original entry, comparison and the recovery decision.
 Remaining acceptance boundaries: integration/review of this supplementary
 model, and any separately required runtime or deployment work. This artifact
 implements no production anchor, archived storage service, loss detector or
-compaction algorithm; it does not establish operator independence or change
+production compaction implementation; it does not establish operator independence or change
 existing public formal/runtime claim counts. The broader safe/recovery model
 continues to assume trusted archived bytes and independently retained anchor
 continuity, and explicitly shows failure when all witnesses roll back together.
+
+
+## Issue #906 model acceptance mapping
+
+The later issue refinement governs the timing claim: atomic authoritative
+consumption precedes entry; asynchronous anchoring establishes recovery
+coverage, never a forged pre-entry timestamp. A synchronous deployment could
+add an anchor-acknowledgement guard, but that stronger topology is not claimed.
+
+| Requested model criterion | Implemented evidence |
+| --- | --- |
+| Explicit replay fact, completeness, frontier/root, anchor state | `log`, `coverage`, `frontier`/`checkpoint`, external `anchor`, `highWater`, `anchorState`; `Complete` checks consistency |
+| Atomic consumed fact before entry | Separate `ConsumeLinearized` and `ProviderEntry`, one-use receipt, `EntryHasPriorConsume` |
+| Replay/dispatch/terminal/checkpoint loss | `LocalLoss` has each of the four named mutations |
+| Primary plus checkpoint rollback | `LocalLoss("RollbackPrimaryAndCheckpoint")` invalidates continuity, requires nonempty covering anchor before recovery |
+| External anchor advance | `CheckpointAnchored` advances root/frontier and archives payload asynchronously |
+| Anchor rollback/equivocation/unavailability | `AnchorFault` models each detected failure and disables entry |
+| Monotone independent continuity reference | `AnchorHighWaterMonotone` checked in the safe config; rollback can alter the observed anchor but cannot silently reset its retained high-water pin |
+| Complete anchored recovery | `RestoreArchivedBytes` plus `Recover`; fair positive recovery loses both nonempty replay rows and checkpoint |
+| Coverage required before compaction | `CompactReplayRows` requires whole-range anchoring and matching archived payload; `UncoveredCannotCompact` refuses uncovered suffix deletion |
+| Positive compaction recovery | Fair `CompactionSpec` compacts consumed rows/checkpoint, restores archived bytes and recovers COMPLETE; `CompactedStillConsumed` prevents reopening |
+| Uncovered missing suffix fails closed | `UncoveredSpec` reaches real entry/loss, then blocks restoration, recovery and entry |
+| Missing-history unsafe replay | `missing` expected `AtMostOnce` counterexample |
+| Actual indistinguishable H0/H1 comparison | Separate `twoworld` model, checked projection equality, different histories, both possible decisions, fair comparison/decision, unsafe H1 replay |
+| Rolled-back-anchor unsafe replay | `rollback` expected `AtMostOnce` counterexample after anchoring and accepting older history |
+| All-anchor common snapshot assumption failure | `common` expected counterexample explicitly restores every continuity witness |
+| Nonvacuous never-used liveness | Fair no-fault `LiveSpec` proves eventual initial entry |
+
+All issue-level formal criteria above have executable bounded checks. Remaining
+work is independent review and integration of this supplement. Reference
+runtime behavior and external deployment evidence are separate evidence layers,
+not claims established by this model or prerequisites silently asserted as done.
