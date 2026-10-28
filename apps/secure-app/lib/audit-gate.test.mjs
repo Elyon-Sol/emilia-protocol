@@ -31,7 +31,6 @@ const GATE = join(REPO_ROOT, 'scripts/audit-with-exceptions.mjs');
 
 const ICNS = 'https://github.com/advisories/GHSA-w3rx-r6r6-pgpr';
 const OTHER = 'https://github.com/advisories/GHSA-0000-0000-0000';
-const NODE_FORGE = 'https://github.com/advisories/GHSA-86w9-cpqp-85rv';
 const ZOD = 'https://github.com/advisories/GHSA-mrhx-c7xc-m3w5';
 const DEEPMERGE = 'https://github.com/advisories/GHSA-gcqx-w48m-w2h4';
 
@@ -340,18 +339,10 @@ test('the committed exception file satisfies the enforced schema', () => {
   const exceptions = loadExceptions(join(SECURE_APP, 'audit-exceptions.json'));
   assert.deepEqual(
     exceptions.map((exception) => exception.advisory),
-    [NODE_FORGE, ZOD, DEEPMERGE],
+    [ZOD, DEEPMERGE],
     'only the reviewed tooling advisories may be accepted',
   );
-  const [nodeForge, zod, deepmerge] = exceptions;
-  assert.equal(nodeForge.package, 'node-forge');
-  assert.equal(nodeForge.severity, 'high');
-  assert.deepEqual(
-    [...nodeForge.affectedPackages].sort(),
-    ['@expo/cli', '@expo/code-signing-certificates', 'expo', 'node-forge'],
-  );
-  assert.equal(nodeForge.acceptedOnText, '2026-10-02');
-  assert.equal(nodeForge.expiresOnText, '2026-10-30');
+  const [zod, deepmerge] = exceptions;
   assert.equal(zod.package, 'zod');
   assert.equal(zod.severity, 'high');
   assert.deepEqual([...zod.affectedPackages].sort(), ['@expo/cli', 'expo', 'zod']);
@@ -443,8 +434,8 @@ test('the gate passes against the real dependency tree', () => {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   assert.match(stdout, /AUDIT GATE PASS/);
-  assert.match(stdout, /3 accepted advisory\(ies\)/);
-  for (const advisory of [NODE_FORGE, ZOD, DEEPMERGE]) {
+  assert.match(stdout, /2 accepted advisory\(ies\)/);
+  for (const advisory of [ZOD, DEEPMERGE]) {
     assert.ok(
       stdout.split(/\r?\n/).some((line) => line.trim() === advisory),
       `${advisory} must appear as an exact output line`,
