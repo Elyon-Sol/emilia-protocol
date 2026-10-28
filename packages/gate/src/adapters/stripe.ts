@@ -23,6 +23,7 @@ import {
   PROVIDER_SLOT_SPECS,
   authorizationInstanceDigest,
   deriveProviderReplayKey,
+  deriveProviderReplayKeyV2,
 } from '../provider-replay-key.js';
 
 export const STRIPE_ACTION_PACK = Object.freeze([
@@ -91,6 +92,8 @@ export const STRIPE_OPS = adapter.OPS;
 const stripeAllowanceConnectors = new WeakMap<object, {
   stripe: any;
   connectorInstanceId: string;
+  replayVersion?: 2;
+  requestOptions?: Readonly<{ stripeAccount: string }>;
 }>();
 
 export function createStripeManifest(extraActions = []) {
@@ -135,6 +138,55 @@ export async function createStripeAllowanceConnector({
 }
 
 /**
+ * Opt-in v2 setup. The client, credentials and endpoint must be controlled by
+ * trusted deployment code and remain fixed for this connector's lifetime.
+ * A caller-provided fake SDK is not provider authentication. Connect account
+ * context is fixed here and reused on account/mode probes and every payout.
+ * These read-only probes do not prove retention or durable replay history.
+ */
+export async function createStripeAllowanceConnectorV2({ stripe, stripeAccount }: {
+  stripe: any; stripeAccount: string;
+}) {
+  if (typeof stripeAccount !== 'string' || !/^acct_[A-Za-z0-9_]{1,110}$/.test(stripeAccount)
+      || typeof stripe?.accounts?.retrieve !== 'function'
+      || typeof stripe?.balance?.retrieve !== 'function'
+      || typeof stripe?.payouts?.create !== 'function') {
+    throw new TypeError('Stripe v2 requires a fixed account and account/balance/payout client');
+  }
+  const requestOptions = Object.freeze({ stripeAccount });
+  const account = await stripe.accounts.retrieve(null, {}, requestOptions);
+  if (!account || account.id !== stripeAccount) {
+    throw new TypeError('Stripe v2 account probe does not match the fixed request account');
+  }
+  const balance = await stripe.balance.retrieve({}, requestOptions);
+  if (!balance || balance.object !== 'balance' || typeof balance.livemode !== 'boolean') {
+    throw new TypeError('Stripe v2 balance probe did not establish execution mode');
+  }
+  const connectorInstanceId = `stripe:${stripeAccount}:${balance.livemode ? 'live' : 'test'}`;
+  // Capture the method so action callers cannot replace it after construction.
+  // Changing the underlying SDK credentials remains outside this trust boundary.
+  const create = stripe.payouts.create.bind(stripe.payouts);
+  const connector = Object.freeze({});
+  stripeAllowanceConnectors.set(connector, {
+    stripe: { payouts: { create } }, connectorInstanceId, requestOptions, replayVersion: 2,
+  });
+  return connector;
+}
+
+/** Public setup metadata only, not evidence of authority or provider effect. */
+export function stripeAllowanceConnectorIdentity(connector: object): string | null {
+  return stripeAllowanceConnectors.get(connector)?.connectorInstanceId ?? null;
+}
+
+// Frozen contract: changes require a new slot id/commitment, never mutation.
+const STRIPE_V2_SLOT = Object.freeze({
+  ...PROVIDER_SLOT_SPECS['stripe.idempotency-key'],
+  slot_id: 'stripe.idempotency-key.v2', prefix: 'ep2_',
+});
+const STRIPE_V2_CARRIAGE_DIGEST =
+  'sha256:9dc14bb6776332a3bb7ba41d3939e117fdd1074c811ffd03f51b335c44428416';
+
+/**
  * Execute a typed Stripe payout under a signed Gate allowance.
  *
  * The Stripe client and credentials remain in the caller's process. This
@@ -155,6 +207,11 @@ export function guardStripeAllowanceMutation({
   // provider fence by choosing another group. This does not detect store rollback.
   if (attemptGroup !== '1') {
     return Promise.resolve({ ok: false, reason: 'provider_replay_epoch_rotation_unsupported' });
+  }
+  if (configured.replayVersion === 2
+      && ['provider_env', 'providerEnv', 'retry_epoch_digest', 'stripeAccount']
+        .some((key) => Object.hasOwn(allowanceOptions, key))) {
+    return Promise.resolve({ ok: false, reason: 'provider_replay_scope_override_refused' });
   }
   const { stripe, connectorInstanceId } = configured;
   if (!params || typeof params !== 'object' || Array.isArray(params)) {
@@ -219,13 +276,25 @@ export function guardStripeAllowanceMutation({
   if (instance.ok !== true) {
     return Promise.resolve({ ok: false, reason: `provider_replay_key_${instance.reason}` });
   }
-  const replayKey = deriveProviderReplayKey({
-    authorization_digest: instance.digest,
-    caid: 'stripe.payout.create',
-    provider_env: connectorInstanceId,
-    attempt_group: typeof attemptGroup === 'string' ? attemptGroup : '',
-    slot_spec: PROVIDER_SLOT_SPECS['stripe.idempotency-key'],
-  });
+  const replayKey = configured.replayVersion === 2
+    ? deriveProviderReplayKeyV2({
+      authorization_digest: instance.digest,
+      caid: 'stripe.payout.create',
+      provider_env: connectorInstanceId,
+      // The signed allowance artifact selects one stable epoch. Verification
+      // happens inside executeWithGateAllowance before executeAction can run.
+      // No caller rotation or durable epoch history is invented here.
+      retry_epoch_digest: allowanceArtifactDigest,
+      slot_spec: STRIPE_V2_SLOT,
+      carriage_contract_digest: STRIPE_V2_CARRIAGE_DIGEST,
+    })
+    : deriveProviderReplayKey({
+      authorization_digest: instance.digest,
+      caid: 'stripe.payout.create',
+      provider_env: connectorInstanceId,
+      attempt_group: '1',
+      slot_spec: PROVIDER_SLOT_SPECS['stripe.idempotency-key'],
+    });
   if (replayKey.ok !== true) {
     return Promise.resolve({ ok: false, reason: `provider_replay_key_${replayKey.reason}` });
   }
@@ -261,7 +330,7 @@ export function guardStripeAllowanceMutation({
           // authorization; Stripe stores an opaque string it was handed.
           metadata: { ep_replay_key: replayKey.key },
         },
-        { idempotencyKey: replayKey.key },
+        { ...configured.requestOptions, idempotencyKey: replayKey.key },
       );
     },
   });
@@ -273,5 +342,7 @@ export default {
   createStripeManifest,
   guardStripeMutation,
   createStripeAllowanceConnector,
+  createStripeAllowanceConnectorV2,
+  stripeAllowanceConnectorIdentity,
   guardStripeAllowanceMutation,
 };

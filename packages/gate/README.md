@@ -1159,8 +1159,7 @@ Other values refuse with `provider_replay_epoch_rotation_unsupported` before
 provider entry or allowance consumption. This intentionally removes caller
 rotation; existing default callers and v1 derived keys retain their behavior.
 The wrapper has no authenticated durable epoch transition or rollback detector.
-The account-only Stripe connector also does not establish live/test scope.
-Carriage-contract binding and unbiased v2 encoding are also unchanged.
+The v1 account-only Stripe connector does not establish live/test scope.
 These remain deployment/integration gaps; this restriction is not a complete
 resolution of issue #908. The standalone v1 derivation remains a recomputable
 adapter feature and accepts caller-provided groups without authenticating them.
@@ -1177,6 +1176,14 @@ Keep those operations closed to dispatch while reconciling their original keys
 against authenticated provider records and trusted local history. If that history
 is missing or ambiguous, stop for operator recovery; this wrapper cannot prove
 non-entry or authorize migration. Switching groups is not a recovery procedure.
+
+An explicit `createStripeAllowanceConnectorV2({ stripe, stripeAccount })` path
+adds a trusted provider account/Balance-mode probe, fixed Connect request context,
+signed-allowance-bound stable epoch selection, pinned immutable carriage contract
+and unbiased deterministic rejection encoding. It does not add a durable epoch
+registry or restore detection. See
+[`PROVIDER-REPLAY-KEY-v2.md`](../../docs/protocol/PROVIDER-REPLAY-KEY-v2.md)
+for trust assumptions, exclusions, reconciliation and upgrade requirements.
 
 
 ### Cross-rail authority admission
