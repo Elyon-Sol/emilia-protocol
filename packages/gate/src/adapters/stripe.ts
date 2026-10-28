@@ -150,6 +150,12 @@ export function guardStripeAllowanceMutation({
 }) {
   const configured = stripeAllowanceConnectors.get(connector);
   if (!configured) throw new TypeError('guardStripeAllowanceMutation requires a configured Stripe allowance connector');
+  // This adapter has no authenticated, durable epoch-rotation mechanism.
+  // Keep the historical default stable; a request caller cannot release the
+  // provider fence by choosing another group. This does not detect store rollback.
+  if (attemptGroup !== '1') {
+    return Promise.resolve({ ok: false, reason: 'provider_replay_epoch_rotation_unsupported' });
+  }
   const { stripe, connectorInstanceId } = configured;
   if (!params || typeof params !== 'object' || Array.isArray(params)) {
     throw new TypeError('guardStripeAllowanceMutation requires payout params');
@@ -183,9 +189,9 @@ export function guardStripeAllowanceMutation({
   //    (operation_namespace, action_fence_digest) for live operations, and
   //    allowanceActionFenceDigest deliberately excludes the operation id field.
   //    So the derived key follows the fence the Gate already enforces rather
-  //    than opening a hole. An operator who genuinely needs a second identical
-  //    payout supplies a different attemptGroup, which is an explicit act that
-  //    releases the provider-side fence for that authorization.
+  //    than opening a hole. This path supports only the stable group '1'. A
+  //    second identical payout requires separate authority; caller-selected
+  //    groups are not authenticated retry epochs and are refused above.
   //  - Stripe prunes keys after at least 24 hours. Beyond that window Stripe
   //    stops being a second consumer of this authorization and the fence is
   //    ours alone. See PROVIDER_KEY_RETENTION_MEASUREMENT.
