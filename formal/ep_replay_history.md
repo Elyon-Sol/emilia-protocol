@@ -15,8 +15,9 @@ provider entry may carry `anchored = 0`. A later anchor is never treated as a
 pre-entry timestamp. Synchronous anchoring is not modeled or required.
 
 The two stores are (1) authoritative replay log plus local checkpoint, dispatch
-and terminal rows, and (2) external anchor root/frontier and retained high-water
-mark. A root is the exact ordered sequence, abstracting collision resistance;
+and terminal rows, and (2) external anchor root/frontier, retained high-water
+mark, and trusted archived payload bytes sealed at that frontier. The archived
+payload is explicit retained data, not bytes inferred from a commitment root. A root is the exact ordered sequence, abstracting collision resistance;
 frontiers are sequence lengths. `Complete` requires local checkpoint/log root
 agreement and consistency with the anchor prefix and high-water mark. This
 single-identity, two-attempt abstraction deliberately has only roots `<<>>`
@@ -28,9 +29,11 @@ outstanding receipts. Unavailable, rolled-back and equivocating anchor views
 block entry. `Recover` can restore COMPLETE only for a matching covered root
 and frontier. Rollback with an empty anchor stays uncertain even if it happened
 in a never-used history: this conservative availability cost prevents treating
-an uncovered lost suffix as unused. Recovery does not reconstruct lost bytes;
-matching bytes must already have been restored. There is no compaction algorithm
-or automatic recovery liveness claim.
+an uncovered lost suffix as unused. `RestoreArchivedBytes` restores missing replay and checkpoint bytes from
+the explicitly retained trusted archive only when its root matches the current
+anchor and its frontier covers the required missing range. `Recover` then
+reestablishes completeness. There is no compaction algorithm or unconditional
+recovery liveness claim: unavailable bytes or an uncovered tail remain blocked.
 
 ## Assumptions and their failure
 
@@ -58,7 +61,14 @@ attacker controlling every continuity witness. Those observer records and the
 - `UncertainCannotAdmit`: incomplete or inconsistent history disables entry.
 - `NeverUsedEventuallyEnters`: under weak fairness of consume and entry and
   no faults, a never-used identity eventually enters. This prevents a vacuous
-  deny-everything model; faulted histories have no liveness guarantee.
+  deny-everything model; faulted histories have no general liveness guarantee.
+- `EventuallyRecovered`: a directed fair scenario enters, asynchronously seals,
+  loses both nonempty replay rows and checkpoint, restores archived bytes, and
+  recovers COMPLETE. `RecoveredStillConsumed` proves it cannot consume again.
+- `UncoveredTailBlocked`: a directed negative scenario enters before anchoring,
+  loses its replay rows, and cannot restore the empty archive, recover COMPLETE,
+  or enter again. `EventuallyUncoveredLoss` ensures the scenario reaches loss,
+  rather than passing vacuously.
 
 `missing` uses `UnsafeTreatMissingHistoryAsUnused`: H1 consumes and enters, all
 local replay evidence is forgotten, and the recovered empty view is treated as
@@ -81,6 +91,12 @@ Each run uses one worker, 512 MiB heap and a 60-second wall-time bound, with
 isolated temporary state deleted afterwards. Raw logs are preserved here in
 `ep_replay_history_results/`. The runner requires success for safe/liveness
 and the named mutation, two consumes, two entries and AtMostOnce failure for
-each negative control. It does not count a parser failure as a counterexample.
+each unsafe counterexample. It also requires successful temporal checking for
+positive recovery and uncovered-tail reachability/refusal. It does not count a
+parser failure as a counterexample.
+
+Current run: safe 52,681 generated / 14,497 distinct states; live 10 / 9;
+recovery 9 / 8; uncovered tail 4 / 4. Expected unsafe violations: missing
+1,713 / 804; rollback and common snapshot each 3,653 / 1,526.
 No repository-wide suite or shared evidence generation is needed for this
 standalone model. It is not added to existing formal/runtime claim counts.

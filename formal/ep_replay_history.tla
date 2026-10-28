@@ -5,7 +5,7 @@ VARIABLE s
 vars == <<s>>
 \* One exact identity, two admission attempts; roots are collision-free sequences.
 Empty == <<>>
-Init == s = [log |-> Empty, checkpoint |-> Empty, anchor |-> Empty,
+Init == s = [log |-> Empty, checkpoint |-> Empty, anchor |-> Empty, archive |-> Empty,
   frontier |-> 0, highWater |-> 0, coverage |-> "COMPLETE",
   anchorState |-> "CURRENT", continuity |-> TRUE,
   receipt |-> 0, linearized |-> {}, entries |-> Empty,
@@ -33,7 +33,7 @@ ProviderEntry ==
 CheckpointAnchored ==
   /\ s.continuity /\ s.anchorState = "CURRENT"
   /\ Len(s.log) > Len(s.anchor)
-  /\ s' = [s EXCEPT !.anchor = s.log, !.highWater = Len(s.log)]
+  /\ s' = [s EXCEPT !.anchor = s.log, !.archive = s.log, !.highWater = Len(s.log)]
 Finish == /\ s.dispatch /\ ~s.terminal
           /\ s' = [s EXCEPT !.terminal = TRUE]
 \* Every local destructive event invalidates continuity, including an unanchored tail.
@@ -53,6 +53,16 @@ AnchorFault(kind) ==
   /\ s' = [s EXCEPT !.faults = @ \cup {kind}, !.receipt = 0,
       !.anchorState = kind,
       !.anchor = IF kind = "ROLLED_BACK" THEN Empty ELSE @]
+\* Trusted archived payload belongs to the external store, not a root inversion.
+\* Restoration is allowed only when the anchor covers the declared lost range.
+RestoreArchivedBytes ==
+  /\ ~s.continuity /\ s.anchorState = "CURRENT"
+  /\ s.archive = s.anchor /\ Len(s.anchor) = s.highWater
+  /\ s.frontier <= Len(s.anchor)
+  /\ ("RollbackPrimaryAndCheckpoint" \in s.faults => Len(s.anchor) = 1)
+  /\ (s.log # s.archive \/ s.checkpoint # s.archive)
+  /\ s' = [s EXCEPT !.log = s.archive, !.checkpoint = s.archive,
+      !.frontier = Len(s.archive)]
 \* Reconstruct only a covered range: no missing unanchored suffix can be forgotten.
 Recover ==
   /\ ~s.continuity /\ s.anchorState = "CURRENT"
@@ -65,7 +75,7 @@ UnsafeTreatMissingHistoryAsUnused ==
   /\ Mode = "missing" /\ Len(s.entries) = 1
   /\ "MissingAsUnused" \notin s.faults
   /\ s' = [s EXCEPT !.log = Empty, !.checkpoint = Empty,
-      !.anchor = Empty, !.frontier = 0, !.highWater = 0,
+      !.anchor = Empty, !.archive = Empty, !.frontier = 0, !.highWater = 0,
       !.coverage = "COMPLETE", !.continuity = TRUE,
       !.anchorState = "CURRENT", !.receipt = 0,
       !.dispatch = FALSE, !.terminal = FALSE,
@@ -74,7 +84,7 @@ UnsafeAllowRolledBackAnchor ==
   /\ Mode = "rollback" /\ Len(s.entries) = 1 /\ s.highWater = 1
   /\ "AcceptedOldAnchor" \notin s.faults
   /\ s' = [s EXCEPT !.log = Empty, !.checkpoint = Empty,
-      !.anchor = Empty, !.frontier = 0, !.highWater = 0,
+      !.anchor = Empty, !.archive = Empty, !.frontier = 0, !.highWater = 0,
       !.coverage = "COMPLETE", !.continuity = TRUE,
       !.anchorState = "CURRENT", !.receipt = 0,
       !.faults = @ \cup {"AcceptedOldAnchor"}]
@@ -83,7 +93,7 @@ CommonSnapshotRestore ==
   /\ Mode = "common" /\ Len(s.entries) = 1 /\ s.highWater = 1
   /\ "AllWitnessesRestored" \notin s.faults
   /\ s' = [s EXCEPT !.log = Empty, !.checkpoint = Empty,
-      !.anchor = Empty, !.frontier = 0, !.highWater = 0,
+      !.anchor = Empty, !.archive = Empty, !.frontier = 0, !.highWater = 0,
       !.coverage = "COMPLETE", !.continuity = TRUE,
       !.anchorState = "CURRENT", !.receipt = 0,
       !.faults = @ \cup {"AllWitnessesRestored"}]
@@ -91,12 +101,13 @@ Next == \/ ConsumeLinearized \/ ProviderEntry \/ CheckpointAnchored \/ Finish
         \/ \E k \in {"LoseReplayRows", "LoseDispatchRows", "LoseTerminalEvidence",
                       "LoseCheckpoint", "RollbackPrimaryAndCheckpoint"}: LocalLoss(k)
         \/ \E k \in {"UNAVAILABLE", "ROLLED_BACK", "EQUIVOCATED"}: AnchorFault(k)
-        \/ Recover \/ UnsafeTreatMissingHistoryAsUnused
+        \/ RestoreArchivedBytes \/ Recover \/ UnsafeTreatMissingHistoryAsUnused
         \/ UnsafeAllowRolledBackAnchor \/ CommonSnapshotRestore
 Spec == Init /\ [][Next]_vars
 LiveSpec == Spec /\ WF_vars(ConsumeLinearized) /\ WF_vars(ProviderEntry)
 TypeOK == /\ s.log \in {Empty, <<"identity">>}
           /\ s.anchor \in {Empty, <<"identity">>}
+          /\ s.archive \in {Empty, <<"identity">>}
           /\ s.frontier \in 0..1 /\ s.highWater \in 0..1
           /\ s.receipt \in 0..1 /\ Len(s.entries) <= 2
 AtMostOnce == Len(s.entries) <= 1
@@ -104,5 +115,32 @@ EntryHasPriorConsume == \A i \in 1..Len(s.entries):
   /\ s.entries[i].consume \in s.linearized /\ s.entries[i].seq = 1
   /\ s.entries[i].complete
 UncertainCannotAdmit == (~Complete) => ~ENABLED ProviderEntry
+\* Directed positive recovery exercise: enter, seal, lose replay/checkpoint,
+\* restore authenticated archived bytes, then reestablish completeness.
+RecoveryNext ==
+  \/ (s.faults = {} /\ Len(s.entries) = 0 /\ ConsumeLinearized)
+  \/ (s.faults = {} /\ Len(s.entries) = 0 /\ ProviderEntry)
+  \/ (s.faults = {} /\ Len(s.entries) = 1 /\ CheckpointAnchored)
+  \/ (s.faults = {} /\ s.highWater = 1 /\ LocalLoss("LoseReplayRows"))
+  \/ (s.faults = {"LoseReplayRows"} /\ LocalLoss("LoseCheckpoint"))
+  \/ (s.faults = {"LoseReplayRows", "LoseCheckpoint"} /\ RestoreArchivedBytes)
+  \/ (s.faults = {"LoseReplayRows", "LoseCheckpoint"} /\ Recover)
+RecoverySpec == Init /\ [][RecoveryNext]_vars /\ WF_vars(RecoveryNext)
+RecoverySucceeded == /\ s.faults = {"LoseReplayRows", "LoseCheckpoint"}
+                     /\ s.log = <<"identity">> /\ Complete
+EventuallyRecovered == <> RecoverySucceeded
+RecoveredStillConsumed == RecoverySucceeded => ~ENABLED ConsumeLinearized
+\* Negative case: an admitted consume in an uncovered suffix cannot be erased
+\* merely because the last archived checkpoint is the empty genesis state.
+UncoveredNext ==
+  \/ (s.faults = {} /\ Len(s.entries) = 0 /\ ConsumeLinearized)
+  \/ (s.faults = {} /\ Len(s.entries) = 0 /\ ProviderEntry)
+  \/ (s.faults = {} /\ Len(s.entries) = 1 /\ LocalLoss("LoseReplayRows"))
+  \/ RestoreArchivedBytes \/ Recover
+UncoveredSpec == Init /\ [][UncoveredNext]_vars /\ WF_vars(UncoveredNext)
+UncoveredTailBlocked == s.faults # {} =>
+  /\ ~Complete /\ ~ENABLED RestoreArchivedBytes
+  /\ ~ENABLED Recover /\ ~ENABLED ProviderEntry
+EventuallyUncoveredLoss == <> (s.faults = {"LoseReplayRows"})
 NeverUsedEventuallyEnters == <> (Len(s.entries) = 1)
 =============================================================================
