@@ -58,6 +58,37 @@
       "accepted_on": "2026-10-26",
       "expires_on": "2026-11-16",
       "revisit_trigger": "When @expo/cli ships a release that accepts zod >=4.6.6, refresh the lock, require a zero-advisory npm audit, and delete this entry. Revisit immediately if any app source imports zod, if npm reports a new package in this advisory's affected set, or if severity changes."
+    },
+    {
+      "advisory": "https://github.com/advisories/GHSA-gcqx-w48m-w2h4",
+      "advisory_ids": [],
+      "package": "deepmerge",
+      "severity": "low",
+      "title": "deepmerge mergeObject() allows prototype poisoning of returned objects",
+      "affected_packages": [
+        "@expo/cli",
+        "@expo/config",
+        "@expo/local-build-cache-provider",
+        "@expo/metro-config",
+        "@expo/prebuild-config",
+        "deepmerge",
+        "expo"
+      ],
+      "reachability": "Developer and CI build tooling only. The single installed copy is deepmerge 4.3.1, reached through expo 57.0.31 into @expo/cli, @expo/config, @expo/metro-config, @expo/prebuild-config and @expo/local-build-cache-provider (verified with npm ls on 2026-10-27). These packages merge developer-authored app, Metro and prebuild configuration on the developer or CI machine. Nothing derived from approval requests, pairing payloads, receipts or network input reaches mergeObject, and the merged configuration is not shipped in the device bundle.",
+      "no_upstream_fix": {
+        "checked_on": "2026-10-27",
+        "advisory_range": ">=4.2.0 <=4.3.1",
+        "npm_vulnerability_range": ">=4.2.0 <=4.3.1",
+        "installed_version": "4.3.1",
+        "latest_published_version": "4.3.1",
+        "npm_suggested_fix": "expo 51.0.39 (semver-major downgrade)",
+        "how_checked": "GitHub advisory GHSA-gcqx-w48m-w2h4 lists no first patched version. npm view deepmerge version returns 4.3.1, which is inside the vulnerable range.",
+        "why_suggested_fix_rejected": "expo 51 is a major SDK behind the pinned expo 57.0.31, which would trade one low-severity build-time advisory for an unsupported runtime."
+      },
+      "accepted_by": "EMILIA Protocol maintainers",
+      "accepted_on": "2026-10-27",
+      "expires_on": "2026-11-26",
+      "revisit_trigger": "When deepmerge publishes a release outside >=4.2.0 <=4.3.1, refresh the lock so @expo/config resolves it, require a zero-advisory npm audit, and delete this entry. Revisit immediately if the Expo SDK upgrades and deepmerge leaves the tree, or if @expo/config starts merging untrusted input."
     }
   ]
 }
