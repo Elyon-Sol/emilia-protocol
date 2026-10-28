@@ -9,7 +9,7 @@
     "gargoyle/envelope.py": "ba5f14578a9a38f20a0cfccd4c6107365196b971c4070f82161d59b181eb41c0"
   },
   "gargoyle_version": "0.19.0.dev0",
-  "emilia_checkout_commit": "fbe7d01a3bb671a40757075885f67b022962bed2",
+  "emilia_checkout_commit": "0fdd4ae2e58624a95cdac0d0171c71b2fcd43528",
   "emilia_vectors_clean": true,
   "python": "Python 3.14.4",
   "node": "v22.23.4",
