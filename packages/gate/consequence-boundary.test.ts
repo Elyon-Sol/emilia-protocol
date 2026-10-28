@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createFileReplayHistoryCheckpoint, provisionReplayHistoryCheckpoint } from './src/replay-history-checkpoint.js';
-import { replayHistoryGenesis, createPostgresReplayHistoryAuthority, REPLAY_HISTORY_DDL, REPLAY_HISTORY_SQL, replayHistoryBootstrap } from './src/replay-history-authority.js';
+import { createFileReplayHistoryCheckpoint, provisionReplayHistoryCheckpoint } from './replay-history-checkpoint.js';
+import { replayHistoryGenesis, createPostgresReplayHistoryAuthority, REPLAY_HISTORY_DDL, REPLAY_HISTORY_SQL, replayHistoryBootstrap } from './replay-history-authority.js';
 import test from 'node:test';
 import { ml_dsa65 } from '@noble/post-quantum/ml-dsa.js';
 import {

@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile, unlink, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createFileReplayHistoryCheckpoint, provisionReplayHistoryCheckpoint } from './dist/replay-history-checkpoint.js';
+import { createFileReplayHistoryCheckpoint, provisionReplayHistoryCheckpoint } from './replay-history-checkpoint.js';
 const root = `sha256:${'a'.repeat(64)}`;
 const next = `sha256:${'b'.repeat(64)}`;
 async function fixture(run) {
